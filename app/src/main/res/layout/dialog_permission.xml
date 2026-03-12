@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Default layout for the PermissionDialog.
+    All visual properties (colors, text sizes) are applied programmatically
+    from DialogConfig so developers can customise without forking layouts.
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/permission_dialog_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:minWidth="280dp"
+    android:maxWidth="320dp">
+
+    <!-- Icon slot (optional — hidden by default) -->
+    <ImageView
+        android:id="@+id/iv_permission_icon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:visibility="gone"
+        android:contentDescription="@null" />
+
+    <!-- Title -->
+    <TextView
+        android:id="@+id/tv_permission_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Permission Required"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:textColor="#212121"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Message -->
+    <TextView
+        android:id="@+id/tv_permission_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="This permission is required for the app to function properly."
+        android:textSize="14sp"
+        android:textColor="#616161"
+        android:lineSpacingMultiplier="1.4"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E0E0E0"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Button row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end">
+
+        <!-- Cancel / Negative button -->
+        <Button
+            android:id="@+id/btn_permission_cancel"
+            style="?attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cancel"
+            android:textColor="#757575"
+            android:minWidth="80dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp" />
+
+        <!-- Open Settings / Positive button -->
+        <Button
+            android:id="@+id/btn_permission_settings"
+            style="?attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Open Settings"
+            android:textColor="#2196F3"
+            android:textStyle="bold"
+            android:minWidth="80dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp" />
+
+    </LinearLayout>
+
+</LinearLayout>
