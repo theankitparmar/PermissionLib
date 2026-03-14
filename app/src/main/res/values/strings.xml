@@ -1,3 +1,10 @@
 <resources>
-    <string name="app_name">permissionlib</string>
+    <!-- PermissionLib dialog strings.
+         Prefix "permlib_" avoids conflicts with the host app's own string resources.
+         Translators: copy these into your values-XX/strings.xml to localise. -->
+    <string name="permlib_title_permission_required">Permission Required</string>
+    <string name="permlib_msg_permission_required">This permission is required for the app to function properly. Please grant it from App Settings.</string>
+    <string name="permlib_btn_continue">Continue</string>
+    <string name="permlib_btn_cancel">Cancel</string>
+    <string name="permlib_btn_open_settings">Open Settings</string>
 </resources>

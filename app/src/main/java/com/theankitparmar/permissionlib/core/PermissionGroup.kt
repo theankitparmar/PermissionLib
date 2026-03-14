@@ -3,7 +3,7 @@
  * Author  : Ankit Parmar
  * GitHub  : https://github.com/theankitparmar
  * Email   : codewithankit@gmail.com
- * Version : 1.0.56
+ * Version : 1.0.57
  */
 
 package com.theankitparmar.permissionlib.core
@@ -23,6 +23,11 @@ import android.os.Build
  *     .onGranted { startVideoCall() }
  *     .request()
  * ```
+ *
+ * **Important — empty arrays:** Some groups return an empty array on older API levels
+ * (e.g. [NOTIFICATIONS] below API 33, [ACTIVITY_RECOGNITION] below API 29).
+ * When spread into [PermissionRequest.permissions], an empty array results in an
+ * immediate [PermissionRequest.onGranted] callback — no system dialog is shown.
  */
 object PermissionGroup {
 
@@ -38,46 +43,81 @@ object PermissionGroup {
         Manifest.permission.RECORD_AUDIO
     )
 
-    /** Precise and approximate location. */
+    /** Precise and approximate foreground location. */
     val LOCATION = arrayOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION
     )
 
-    /** Background location (requires LOCATION group first on API 29+). */
+    /**
+     * Background location **only**.
+     *
+     * **Must be requested in a separate, subsequent call AFTER [LOCATION] is already granted.**
+     * Since Android 11 (API 30) the system silently ignores [Manifest.permission.ACCESS_BACKGROUND_LOCATION]
+     * if it is bundled together with foreground location permissions in the same request.
+     *
+     * Typical usage:
+     * ```kotlin
+     * // Step 1 — grant foreground location
+     * PermissionManager.with(this)
+     *     .permissions(*PermissionGroup.LOCATION)
+     *     .onGranted {
+     *         // Step 2 — only then request background location
+     *         PermissionManager.with(this)
+     *             .permissions(*PermissionGroup.LOCATION_BACKGROUND)
+     *             .onGranted { startBackgroundTracking() }
+     *             .request()
+     *     }
+     *     .request()
+     * ```
+     */
     val LOCATION_BACKGROUND = arrayOf(
-        Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_BACKGROUND_LOCATION
     )
 
     /**
-     * Storage – scoped to API level.
-     * - API 33+: READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO
-     * - Below:   READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
+     * Storage — scoped to API level.
+     * - API 34+ : READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO, READ_MEDIA_VISUAL_USER_SELECTED
+     * - API 33  : READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO
+     * - Below   : READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
      */
     val STORAGE: Array<String>
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(
+        get() = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            )
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> arrayOf(
                 Manifest.permission.READ_MEDIA_IMAGES,
                 Manifest.permission.READ_MEDIA_VIDEO,
                 Manifest.permission.READ_MEDIA_AUDIO
             )
-        } else {
-            @Suppress("DEPRECATION")
-            arrayOf(
+            else -> @Suppress("DEPRECATION") arrayOf(
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
             )
         }
 
-    /** Images only (API 33+: READ_MEDIA_IMAGES, below: READ_EXTERNAL_STORAGE). */
+    /**
+     * Images only — scoped to API level.
+     * - API 34+ : READ_MEDIA_IMAGES + READ_MEDIA_VISUAL_USER_SELECTED (partial photo access)
+     * - API 33  : READ_MEDIA_IMAGES
+     * - Below   : READ_EXTERNAL_STORAGE
+     */
     val STORAGE_IMAGES: Array<String>
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
-        } else {
-            @Suppress("DEPRECATION")
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        get() = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            )
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES
+            )
+            else -> @Suppress("DEPRECATION") arrayOf(
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            )
         }
 
     /** Phone call & state permissions. */
@@ -99,22 +139,28 @@ object PermissionGroup {
     )
 
     /**
-     * Bluetooth – scoped to API level.
-     * - API 31+: BLUETOOTH_SCAN, BLUETOOTH_CONNECT
-     * - Below:   BLUETOOTH (deprecated)
+     * Bluetooth — scoped to API level.
+     * - API 31+ : BLUETOOTH_SCAN, BLUETOOTH_CONNECT, BLUETOOTH_ADVERTISE
+     * - Below   : BLUETOOTH (deprecated)
      */
     val BLUETOOTH: Array<String>
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(
                 Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_ADVERTISE
             )
         } else {
             @Suppress("DEPRECATION")
             arrayOf(Manifest.permission.BLUETOOTH)
         }
 
-    /** Notification permission (API 33+ only; returns empty array below). */
+    /**
+     * Notification permission — API 33+ only.
+     * Returns an **empty array** on API 32 and below (notifications are granted by default).
+     * Passing an empty array to [PermissionRequest.permissions] triggers [PermissionRequest.onGranted]
+     * immediately without showing a system dialog.
+     */
     val NOTIFICATIONS: Array<String>
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             arrayOf(Manifest.permission.POST_NOTIFICATIONS)
@@ -123,9 +169,9 @@ object PermissionGroup {
         }
 
     /**
-     * Body sensors (heart rate, etc.).
-     * - API 33+: BODY_SENSORS + BODY_SENSORS_BACKGROUND
-     * - Below:   BODY_SENSORS only
+     * Body sensors (heart rate, etc.) — scoped to API level.
+     * - API 33+ : BODY_SENSORS + BODY_SENSORS_BACKGROUND
+     * - Below   : BODY_SENSORS only
      */
     val BODY_SENSORS: Array<String>
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -137,7 +183,10 @@ object PermissionGroup {
             arrayOf(Manifest.permission.BODY_SENSORS)
         }
 
-    /** Activity recognition (step counter, detected activity). Requires API 29+. */
+    /**
+     * Activity recognition (step counter, detected activity) — API 29+ only.
+     * Returns an **empty array** on API 28 and below.
+     */
     val ACTIVITY_RECOGNITION: Array<String>
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             arrayOf(Manifest.permission.ACTIVITY_RECOGNITION)

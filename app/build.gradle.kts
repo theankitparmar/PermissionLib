@@ -14,7 +14,7 @@ plugins {
 // ── Library coordinates ───────────────────────────────────────────────────────
 val libGroupId    = "com.github.theankitparmar"
 val libArtifactId = "permissionlib"
-val libVersion    = "1.0.56"
+val libVersion    = "1.0.57"
 
 android {
     namespace  = "com.theankitparmar.permissionlib"
@@ -47,6 +47,14 @@ android {
 
     buildFeatures {
         buildConfig = false
+        viewBinding = true
+    }
+
+    lint {
+        abortOnError       = true
+        warningsAsErrors   = false
+        checkReleaseBuilds = true
+        disable            += "GradleDependency"   // allow pinned versions
     }
 
     publishing {
@@ -61,44 +69,43 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-
-    implementation("androidx.activity:activity-ktx:1.9.0")
-    implementation("androidx.fragment:fragment-ktx:1.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
+    api(libs.androidx.activity.ktx)
+    api(libs.androidx.fragment.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(libs.junit)
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+    testImplementation(libs.mockito.kotlin)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
 // ── Maven publishing (required for JitPack) ───────────────────────────────────
-afterEvaluate {
-    publishing {
-        publications {
-            create<MavenPublication>("release") {
-                from(components["release"])
-                groupId    = libGroupId
-                artifactId = libArtifactId
-                version    = libVersion
+publishing {
+    publications {
+        register<MavenPublication>("release") {
+            // components["release"] is only available after AGP processes variants
+            afterEvaluate { from(components["release"]) }
 
-                pom {
-                    name.set("PermissionLib")
-                    description.set("Lightweight Android runtime permission manager with a fluent Kotlin API.")
-                    url.set("https://github.com/theankitparmar/permissionlib")
-                    licenses {
-                        license {
-                            name.set("MIT License")
-                            url.set("https://opensource.org/licenses/MIT")
-                        }
+            groupId    = libGroupId
+            artifactId = libArtifactId
+            version    = libVersion
+
+            pom {
+                name.set("PermissionLib")
+                description.set("Lightweight Android runtime permission manager with a fluent Kotlin API.")
+                url.set("https://github.com/theankitparmar/permissionlib")
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
                     }
-                    developers {
-                        developer {
-                            id.set("theankitparmar")
-                            name.set("Ankit Parmar")
-                            email.set("codewithankit@gmail.com")
-                        }
+                }
+                developers {
+                    developer {
+                        id.set("theankitparmar")
+                        name.set("Ankit Parmar")
+                        email.set("codewithankit@gmail.com")
                     }
                 }
             }

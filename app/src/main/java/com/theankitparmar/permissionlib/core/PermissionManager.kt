@@ -3,7 +3,7 @@
  * Author  : Ankit Parmar
  * GitHub  : https://github.com/theankitparmar
  * Email   : codewithankit@gmail.com
- * Version : 1.0.56
+ * Version : 1.0.57
  */
 
 package com.theankitparmar.permissionlib.core
@@ -13,13 +13,18 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultCaller
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.MainThread
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.theankitparmar.permissionlib.R
 import com.theankitparmar.permissionlib.dialog.PermissionDialog
 import com.theankitparmar.permissionlib.utils.PermissionUtils
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -28,9 +33,9 @@ import kotlin.coroutines.resume
 /**
  * Central orchestrator for all runtime permission operations.
  *
- * Instances are created via the [with] factory methods and are
- * lifecycle-aware — they clean up automatically when the host Activity
- * or Fragment is destroyed, preventing memory leaks and crashes.
+ * Instances are created via the [with] factory methods and are lifecycle-aware —
+ * they clean up automatically when the host Activity or Fragment is destroyed,
+ * preventing memory leaks and stale callbacks.
  *
  * ### Quick-start
  * ```kotlin
@@ -54,24 +59,25 @@ import kotlin.coroutines.resume
  * ```
  */
 class PermissionManager private constructor(
-    private val activity: FragmentActivity
+    /** Used to register [ActivityResultLauncher]s — either a [FragmentActivity] or a [Fragment]. */
+    private val caller: ActivityResultCaller,
+    /** Host activity — used for context, `isFinishing`/`isDestroyed` checks, and settings intent. */
+    private val activity: FragmentActivity,
+    /** Fragment manager to use for dialogs — [FragmentActivity.supportFragmentManager] or
+     *  [Fragment.childFragmentManager] so dialogs are scoped to the correct back-stack. */
+    private val fragmentManager: FragmentManager,
+    lifecycleOwner: LifecycleOwner
 ) : DefaultLifecycleObserver {
-
-    // ─── Dialog tag constants ────────────────────────────────────
-    private companion object Tags {
-        const val TAG_RATIONALE     = "permlib_rationale"
-        const val TAG_PERM_DENIED   = "permlib_permanent_deny"
-    }
 
     // ─── Activity Result launchers ───────────────────────────────
     private var permissionLauncher: ActivityResultLauncher<Array<String>>? = null
-    private var settingsLauncher: ActivityResultLauncher<Intent>? = null
-    private var pendingRequest: PermissionRequest? = null
+    private var settingsLauncher:   ActivityResultLauncher<Intent>? = null
+    private var pendingRequest:     PermissionRequest? = null
 
     // ─── Init / Lifecycle ────────────────────────────────────────
 
     init {
-        activity.lifecycle.addObserver(this)
+        lifecycleOwner.lifecycle.addObserver(this)
         registerLaunchers()
     }
 
@@ -79,18 +85,18 @@ class PermissionManager private constructor(
         pendingRequest = null
         permissionLauncher = null
         settingsLauncher = null
-        activity.lifecycle.removeObserver(this)
+        owner.lifecycle.removeObserver(this)
     }
 
     private fun registerLaunchers() {
-        permissionLauncher = activity.registerForActivityResult(
+        permissionLauncher = caller.registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { resultsMap: Map<String, Boolean> ->
             val request = pendingRequest ?: return@registerForActivityResult
             handlePermissionResults(resultsMap, request)
         }
 
-        settingsLauncher = activity.registerForActivityResult(
+        settingsLauncher = caller.registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { _: ActivityResult ->
             val request = pendingRequest ?: return@registerForActivityResult
@@ -101,17 +107,42 @@ class PermissionManager private constructor(
     // ─── Factory / companion ─────────────────────────────────────
 
     companion object {
+        private const val TAG             = "PermissionManager"
+        private const val TAG_RATIONALE   = "permlib_rationale"
+        private const val TAG_PERM_DENIED = "permlib_permanent_deny"
 
-        /** Begin building a permission request scoped to the given [FragmentActivity]. */
+
+        /**
+         * Begin building a permission request scoped to the given [FragmentActivity].
+         * The manager is lifecycle-bound to the activity.
+         */
         fun with(activity: FragmentActivity): PermissionRequest =
-            PermissionRequest(PermissionManager(activity))
+            PermissionRequest(
+                PermissionManager(
+                    caller          = activity,
+                    activity        = activity,
+                    fragmentManager = activity.supportFragmentManager,
+                    lifecycleOwner  = activity
+                )
+            )
 
         /**
          * Begin building a permission request scoped to the given [Fragment].
-         * The request is lifecycle-scoped to the fragment's host activity.
+         *
+         * The manager observes the **fragment's** lifecycle (not the activity's), so
+         * cleanup happens when the fragment is destroyed — even if the host activity
+         * survives. Dialogs are shown on the fragment's [Fragment.childFragmentManager]
+         * to match the fragment's back-stack scope.
          */
         fun with(fragment: Fragment): PermissionRequest =
-            PermissionRequest(PermissionManager(fragment.requireActivity() as FragmentActivity))
+            PermissionRequest(
+                PermissionManager(
+                    caller          = fragment,
+                    activity        = fragment.requireActivity() as FragmentActivity,
+                    fragmentManager = fragment.childFragmentManager,
+                    lifecycleOwner  = fragment
+                )
+            )
 
         // ─── Static helpers ──────────────────────────────────────
 
@@ -119,7 +150,14 @@ class PermissionManager private constructor(
         fun isPermissionGranted(context: Context, permission: String): Boolean =
             PermissionUtils.isGranted(context, permission)
 
-        /** `true` when [permission] is permanently denied ("Don't ask again" selected). */
+        /**
+         * `true` when [permission] is permanently denied ("Don't ask again" selected).
+         *
+         * **Note:** This also returns `true` for permissions that have **never** been
+         * requested, because [android.app.Activity.shouldShowRequestPermissionRationale]
+         * returns `false` in both cases. Only call this after a permission has been
+         * denied at least once.
+         */
         fun isPermanentlyDenied(activity: Activity, permission: String): Boolean =
             PermissionUtils.isPermanentlyDenied(activity, permission)
 
@@ -134,7 +172,16 @@ class PermissionManager private constructor(
 
     // ─── Internal execution (called by PermissionRequest) ────────
 
+    @MainThread
     internal fun executeRequest(request: PermissionRequest) {
+        // Empty permission list → treat as all granted.
+        // This happens when a PermissionGroup returns emptyArray() for the current API level
+        // (e.g. NOTIFICATIONS on API < 33, ACTIVITY_RECOGNITION on API < 29).
+        if (request.permissions.isEmpty()) {
+            dispatchGranted(request, emptyList())
+            return
+        }
+
         // Fast-path: everything already granted
         val notGranted = PermissionUtils.filterNotGranted(activity, request.permissions)
         if (notGranted.isEmpty()) {
@@ -142,9 +189,14 @@ class PermissionManager private constructor(
             return
         }
 
+        // Guard against concurrent requests on the same manager instance
+        if (pendingRequest != null && pendingRequest !== request) {
+            Log.w(TAG, "A permission request is already in progress. Ignoring concurrent request.")
+            return
+        }
+
         pendingRequest = request
 
-        // Show rationale before the system dialog if the developer configured one
         val needsRationale = notGranted.any { PermissionUtils.shouldShowRationale(activity, it) }
         if (needsRationale && request.rationaleMessage != null) {
             showRationaleDialog(request, notGranted)
@@ -155,8 +207,15 @@ class PermissionManager private constructor(
 
     internal suspend fun executeRequestSuspend(request: PermissionRequest): PermissionResults =
         suspendCancellableCoroutine { cont ->
-            request.onResult { results ->
+            // Use a dedicated internal slot so the user's onResult callback is NOT overwritten.
+            request.internalResultCallback = { results ->
                 if (cont.isActive) cont.resume(results)
+            }
+            // Clean up if the calling coroutine is cancelled (e.g. Activity back-pressed,
+            // scope destroyed) so pendingRequest doesn't linger and fire stale callbacks.
+            cont.invokeOnCancellation {
+                request.internalResultCallback = null
+                pendingRequest = null
             }
             executeRequest(request)
         }
@@ -174,30 +233,35 @@ class PermissionManager private constructor(
         resultsMap: Map<String, Boolean>,
         request: PermissionRequest
     ) {
-        val granted      = resultsMap.filter { it.value }.keys.toList()
-        val allDenied    = resultsMap.filter { !it.value }.keys.toList()
-
-        val permanentlyDenied = allDenied.filter { PermissionUtils.isPermanentlyDenied(activity, it) }
-        val softDenied        = allDenied.filter { !PermissionUtils.isPermanentlyDenied(activity, it) }
+        // Partition denied permissions in a single pass (avoids double-invocation of
+        // isPermanentlyDenied, which internally calls isGranted + shouldShowRationale).
+        val (permanentlyDenied, softDenied) = resultsMap
+            .filter { !it.value }
+            .keys
+            .partition { PermissionUtils.isPermanentlyDenied(activity, it) }
 
         // retryOnDenied: automatically re-request soft-denied permissions once
         if (request.retryOnDenied && !request.hasRetried && softDenied.isNotEmpty()) {
             request.hasRetried = true
-            pendingRequest = request
             launchPermissionRequest(softDenied.toTypedArray())
             return
         }
 
-        val results = PermissionResults(
-            granted          = granted,
-            denied           = softDenied,
-            permanentlyDenied = permanentlyDenied
-        )
-
-        if (granted.isNotEmpty() && softDenied.isEmpty() && permanentlyDenied.isEmpty()) {
-            dispatchGranted(request, granted)
+        // Re-check all originally-requested permissions — some may have been granted
+        // before the dialog (already-granted members of a group not in resultsMap).
+        val allNowGranted = PermissionUtils.filterNotGranted(activity, request.permissions).isEmpty()
+        if (allNowGranted) {
+            dispatchGranted(request, request.permissions)
             return
         }
+
+        // Build the aggregate result with the full granted list
+        val granted = request.permissions.filter { PermissionUtils.isGranted(activity, it) }
+        val results = PermissionResults(
+            granted           = granted,
+            denied            = softDenied,
+            permanentlyDenied = permanentlyDenied
+        )
 
         if (softDenied.isNotEmpty()) {
             request.onDenied?.invoke(softDenied)
@@ -212,42 +276,72 @@ class PermissionManager private constructor(
             }
         }
 
-        // Always dispatch aggregate result
-        request.onResult?.invoke(results)
+        dispatchResults(request, results)
     }
 
     private fun dispatchGranted(request: PermissionRequest, permissions: List<String>) {
         request.onGranted?.invoke(permissions)
         request.callback?.onGranted(permissions)
-        request.onResult?.invoke(
-            PermissionResults(granted = permissions, denied = emptyList(), permanentlyDenied = emptyList())
+        val results = PermissionResults(
+            granted           = permissions,
+            denied            = emptyList(),
+            permanentlyDenied = emptyList()
         )
+        dispatchResults(request, results)
+    }
+
+    /**
+     * Clears [pendingRequest] then invokes both the user-facing [PermissionRequest.onResult]
+     * and the internal coroutine callback. Order: clear state first so any re-entrant
+     * request triggered from within a callback starts with a clean slate.
+     */
+    private fun dispatchResults(request: PermissionRequest, results: PermissionResults) {
+        pendingRequest = null
+        request.onResult?.invoke(results)
+        request.internalResultCallback?.invoke(results)
+        request.internalResultCallback = null
+    }
+
+    // ─── Dialog safety ───────────────────────────────────────────
+
+    /**
+     * Returns `true` only when it is safe to commit a fragment transaction.
+     * Prevents [IllegalStateException] from `show()` after `onSaveInstanceState`.
+     */
+    private fun canShowDialog(): Boolean {
+        if (activity.isFinishing || activity.isDestroyed) return false
+        if (fragmentManager.isStateSaved) return false
+        return true
     }
 
     // ─── Dialog helpers ──────────────────────────────────────────
 
     private fun showRationaleDialog(request: PermissionRequest, permissions: List<String>) {
+        if (!canShowDialog()) return
         PermissionDialog.newInstance(
             config = request.dialogConfig.copy(
-                title             = request.rationaleTitle  ?: request.dialogConfig.title,
-                message           = request.rationaleMessage ?: request.dialogConfig.message,
-                positiveButtonText = "Continue",
-                negativeButtonText = "Cancel"
+                title              = request.rationaleTitle   ?: request.dialogConfig.title,
+                message            = request.rationaleMessage ?: request.dialogConfig.message,
+                positiveButtonText = request.rationalePositiveText
+                                         ?: activity.getString(R.string.permlib_btn_continue),
+                negativeButtonText = request.rationaleNegativeText
+                                         ?: activity.getString(R.string.permlib_btn_cancel)
             ),
             onPositive = { launchPermissionRequest(permissions.toTypedArray()) },
             onNegative = {
                 request.onDenied?.invoke(permissions)
                 request.callback?.onDenied(permissions)
             }
-        ).show(activity.supportFragmentManager, TAG_RATIONALE)
+        ).show(fragmentManager, TAG_RATIONALE)
     }
 
     private fun showPermanentlyDeniedDialog(request: PermissionRequest) {
+        if (!canShowDialog()) return
         PermissionDialog.newInstance(
             config     = request.dialogConfig,
             onPositive = { openSettingsForResult() },
             onNegative = null
-        ).show(activity.supportFragmentManager, TAG_PERM_DENIED)
+        ).show(fragmentManager, TAG_PERM_DENIED)
     }
 
     private fun openSettingsForResult() {
@@ -268,7 +362,7 @@ class PermissionManager private constructor(
         )
 
         if (results.allGranted) {
-            dispatchGranted(request, granted)
+            dispatchGranted(request, request.permissions)
         } else {
             if (denied.isNotEmpty()) {
                 request.onDenied?.invoke(denied)
@@ -278,7 +372,7 @@ class PermissionManager private constructor(
                 request.onPermanentlyDenied?.invoke(permanentlyDenied)
                 request.callback?.onPermanentlyDenied(permanentlyDenied)
             }
-            request.onResult?.invoke(results)
+            dispatchResults(request, results)
         }
     }
 }

@@ -1,7 +1,6 @@
 package com.theankitparmar.permissionlib.dialog
 
 import android.app.Dialog
-import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -11,10 +10,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
-import android.widget.Button
-import android.widget.TextView
 import androidx.fragment.app.DialogFragment
-import com.theankitparmar.permissionlib.R
+import com.theankitparmar.permissionlib.databinding.DialogPermissionBinding
 
 /**
  * Default dialog shown when a permission is permanently denied or a rationale is needed.
@@ -25,6 +22,9 @@ import com.theankitparmar.permissionlib.R
  * (e.g. process death) the dialog is dismissed automatically.
  */
 class PermissionDialog : DialogFragment() {
+
+    private var _binding: DialogPermissionBinding? = null
+    private val binding get() = _binding!!
 
     private var onPositiveClick: (() -> Unit)? = null
     private var onNegativeClick: (() -> Unit)? = null
@@ -74,25 +74,26 @@ class PermissionDialog : DialogFragment() {
         }
 
         private fun Bundle.toDialogConfig() = DialogConfig(
-            title              = getString(KEY_TITLE,         "Permission Required")!!,
-            message            = getString(KEY_MESSAGE,       "This permission is required.")!!,
-            positiveButtonText = getString(KEY_POSITIVE_TEXT, "Open Settings")!!,
-            negativeButtonText = getString(KEY_NEGATIVE_TEXT, "Cancel")!!,
-            positiveButtonColor = getInt(KEY_POSITIVE_COLOR,  Color.parseColor("#2196F3")),
-            negativeButtonColor = getInt(KEY_NEGATIVE_COLOR,  Color.parseColor("#757575")),
-            backgroundColor    = getInt(KEY_BG_COLOR,         Color.WHITE),
-            titleFontSize      = getFloat(KEY_TITLE_SIZE,     18f),
-            messageFontSize    = getFloat(KEY_MESSAGE_SIZE,   14f),
-            titleTextColor     = getInt(KEY_TITLE_TEXT_COLOR, Color.parseColor("#212121")),
-            messageTextColor   = getInt(KEY_MSG_TEXT_COLOR,   Color.parseColor("#616161")),
-            isCancelable       = getBoolean(KEY_CANCELABLE,   true)
+            title               = getString(KEY_TITLE,         "Permission Required")!!,
+            message             = getString(KEY_MESSAGE,       "This permission is required.")!!,
+            positiveButtonText  = getString(KEY_POSITIVE_TEXT, "Open Settings")!!,
+            negativeButtonText  = getString(KEY_NEGATIVE_TEXT, "Cancel")!!,
+            positiveButtonColor = getInt(KEY_POSITIVE_COLOR,   DialogConfig.Defaults.COLOR_PRIMARY),
+            negativeButtonColor = getInt(KEY_NEGATIVE_COLOR,   DialogConfig.Defaults.COLOR_GRAY),
+            backgroundColor     = getInt(KEY_BG_COLOR,         Color.WHITE),
+            titleFontSize       = getFloat(KEY_TITLE_SIZE,     18f),
+            messageFontSize     = getFloat(KEY_MESSAGE_SIZE,   14f),
+            titleTextColor      = getInt(KEY_TITLE_TEXT_COLOR, DialogConfig.Defaults.COLOR_TEXT_PRIMARY),
+            messageTextColor    = getInt(KEY_MSG_TEXT_COLOR,   DialogConfig.Defaults.COLOR_TEXT_SECONDARY),
+            isCancelable        = getBoolean(KEY_CANCELABLE,   true)
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // If recreated from saved state (e.g. config change or process death),
-        // the lambda callbacks can't be restored — dismiss safely.
+        // lambda callbacks can't be restored — dismiss safely rather than showing
+        // a non-functional dialog.
         if (savedInstanceState != null && onPositiveClick == null) {
             dismissAllowingStateLoss()
         }
@@ -102,8 +103,9 @@ class PermissionDialog : DialogFragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.dialog_permission, container, false)
+    ): View {
+        _binding = DialogPermissionBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -116,33 +118,39 @@ class PermissionDialog : DialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        applyConfig(view)
+        applyConfig()
     }
 
-    private fun applyConfig(view: View) {
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    private fun applyConfig() {
         // Root card background
-        val cardView = view.findViewById<View>(R.id.permission_dialog_root)
-        cardView.background = GradientDrawable().apply {
+        binding.permissionDialogRoot.background = GradientDrawable().apply {
             setColor(config.backgroundColor)
-            cornerRadius = 16f.dpToPx(requireContext())
+            cornerRadius = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics
+            )
         }
 
         // Title
-        view.findViewById<TextView>(R.id.tv_permission_title).apply {
+        binding.tvPermissionTitle.apply {
             text = config.title
             setTextColor(config.titleTextColor)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, config.titleFontSize)
         }
 
         // Message
-        view.findViewById<TextView>(R.id.tv_permission_message).apply {
+        binding.tvPermissionMessage.apply {
             text = config.message
             setTextColor(config.messageTextColor)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, config.messageFontSize)
         }
 
         // Negative button (Cancel)
-        view.findViewById<Button>(R.id.btn_permission_cancel).apply {
+        binding.btnPermissionCancel.apply {
             text = config.negativeButtonText
             setTextColor(config.negativeButtonColor)
             setOnClickListener {
@@ -152,7 +160,7 @@ class PermissionDialog : DialogFragment() {
         }
 
         // Positive button (Open Settings / Continue)
-        view.findViewById<Button>(R.id.btn_permission_settings).apply {
+        binding.btnPermissionSettings.apply {
             text = config.positiveButtonText
             setTextColor(config.positiveButtonColor)
             background = GradientDrawable().apply { setColor(Color.TRANSPARENT) }
@@ -162,7 +170,4 @@ class PermissionDialog : DialogFragment() {
             }
         }
     }
-
-    private fun Float.dpToPx(context: Context): Float =
-        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, this, context.resources.displayMetrics)
 }

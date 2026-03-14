@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(cat \"C:\\\\Users\\\\parma\\\\.claude\\\\projects\\\\D--Ankit-Work-permissionlib\\\\344bb72e-c1de-4220-b0d1-2787dceeb70d\\\\tool-results\\\\toolu_01Q4iuekv7iyHdCM6tCQVbdw.json\" 2>/dev/null | python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\(data[0]['text']\\)\" 2>/dev/null || true)",
+      "Bash(cd \"D:/Ankit/Work/permissionlib\" && \\\\\n  rm -f app/src/main/res/xml/backup_rules.xml \\\\\n        app/src/main/res/xml/data_extraction_rules.xml \\\\\n        app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml \\\\\n        app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml \\\\\n        app/src/main/res/drawable/ic_launcher_background.xml \\\\\n        app/src/main/res/drawable/ic_launcher_foreground.xml \\\\\n        app/src/main/res/values/themes.xml \\\\\n        app/src/main/res/values-night/themes.xml && \\\\\n  rm -rf app/src/main/res/mipmap-hdpi \\\\\n         app/src/main/res/mipmap-mdpi \\\\\n         app/src/main/res/mipmap-xhdpi \\\\\n         app/src/main/res/mipmap-xxhdpi \\\\\n         app/src/main/res/mipmap-xxxhdpi \\\\\n         app/src/main/res/mipmap-anydpi-v26 && \\\\\n  echo \"Deleted successfully\")",
+      "Bash(cd \"D:/Ankit/Work/permissionlib\" && ./gradlew assembleRelease 2>&1)",
+      "Bash(cd \"D:/Ankit/Work/permissionlib\" && ./gradlew test 2>&1)"
     ]
   }
 }

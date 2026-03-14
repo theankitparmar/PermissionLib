@@ -45,7 +45,7 @@ In your **app** `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.theankitparmar:permissionlib:1.0.56")
+    implementation("com.github.theankitparmar:permissionlib:1.0.57")
 }
 ```
 
@@ -243,6 +243,26 @@ val missing = context.filterDenied(
 )
 ```
 
+### Per-permission sealed state via `toResultList()`
+
+Convert an aggregate result into a per-permission list of typed states:
+
+```kotlin
+lifecycleScope.launch {
+    val results = PermissionManager.with(this@MainActivity)
+        .permissions(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+        .requestSuspend()
+
+    results.toResultList().forEach { state ->
+        when (state) {
+            is PermissionResult.Granted           -> enableFeature(state.permission)
+            is PermissionResult.Denied            -> showRationale(state.permission)
+            is PermissionResult.PermanentlyDenied -> showSettingsPrompt(state.permission)
+        }
+    }
+}
+```
+
 ---
 
 ## PermissionResults
@@ -256,6 +276,18 @@ data class PermissionResults(
     val allGranted:           Boolean  // true if denied and permanentlyDenied are empty
     val anyDenied:            Boolean  // true if at least one was soft-denied
     val anyPermanentlyDenied: Boolean  // true if at least one was permanently denied
+}
+```
+
+## PermissionResult
+
+Sealed class for per-permission typed states, obtained via `PermissionResults.toResultList()`:
+
+```kotlin
+sealed class PermissionResult {
+    data class Granted(val permission: String)           : PermissionResult()
+    data class Denied(val permission: String)            : PermissionResult()
+    data class PermanentlyDenied(val permission: String) : PermissionResult()
 }
 ```
 

@@ -1,4 +1,0 @@
-<resources>
-    <!-- No app-level theme needed — PermissionLib is a library module.
-         The PermissionDialog applies all styling programmatically via DialogConfig. -->
-</resources>
