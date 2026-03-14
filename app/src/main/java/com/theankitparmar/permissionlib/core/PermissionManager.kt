@@ -197,12 +197,10 @@ class PermissionManager private constructor(
 
         pendingRequest = request
 
-        val needsRationale = notGranted.any { PermissionUtils.shouldShowRationale(activity, it) }
-        if (needsRationale && request.rationaleMessage != null) {
-            showRationaleDialog(request, notGranted)
-        } else {
-            launchPermissionRequest(notGranted.toTypedArray())
-        }
+        // Always launch the system dialog first.
+        // Rationale (if configured) is shown in handlePermissionResults *after* the first denial,
+        // never before the system prompt — matching the Android-recommended permission flow.
+        launchPermissionRequest(notGranted.toTypedArray())
     }
 
     internal suspend fun executeRequestSuspend(request: PermissionRequest): PermissionResults =
@@ -244,6 +242,14 @@ class PermissionManager private constructor(
         if (request.retryOnDenied && !request.hasRetried && softDenied.isNotEmpty()) {
             request.hasRetried = true
             launchPermissionRequest(softDenied.toTypedArray())
+            return
+        }
+
+        // Show rationale after first soft denial — only if configured and not yet shown this cycle.
+        // The rationale positive button re-launches the system dialog; negative dispatches denied.
+        if (softDenied.isNotEmpty() && request.rationaleMessage != null && !request.hasShownRationale) {
+            request.hasShownRationale = true
+            showRationaleDialog(request, softDenied)
             return
         }
 
@@ -329,8 +335,18 @@ class PermissionManager private constructor(
             ),
             onPositive = { launchPermissionRequest(permissions.toTypedArray()) },
             onNegative = {
+                // User declined the rationale — treat as a soft denial and clean up state.
+                // Must call dispatchResults so coroutine callers (requestSuspend) are resolved
+                // and pendingRequest is cleared; omitting this causes a permanent hang/leak.
+                val granted = request.permissions.filter { PermissionUtils.isGranted(activity, it) }
+                val results = PermissionResults(
+                    granted           = granted,
+                    denied            = permissions,
+                    permanentlyDenied = emptyList()
+                )
                 request.onDenied?.invoke(permissions)
                 request.callback?.onDenied(permissions)
+                dispatchResults(request, results)
             }
         ).show(fragmentManager, TAG_RATIONALE)
     }

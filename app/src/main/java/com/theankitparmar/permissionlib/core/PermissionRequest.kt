@@ -45,6 +45,7 @@ class PermissionRequest internal constructor(
     internal var rationaleNegativeText:          String? = null
     internal var retryOnDenied:                  Boolean = false
     internal var hasRetried:                     Boolean = false
+    internal var hasShownRationale:              Boolean = false
     internal var callback:                       PermissionCallback? = null
 
     // ─── Fluent API ──────────────────────────────────────────────
