@@ -45,7 +45,7 @@ In your **app** `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.theankitparmar:permissionlib:1.0.57")
+    implementation("com.github.theankitparmar:permissionlib:1.0.56")
 }
 ```
 
