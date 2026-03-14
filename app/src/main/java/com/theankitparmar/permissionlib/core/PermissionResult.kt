@@ -1,7 +1,9 @@
 package com.theankitparmar.permissionlib.core
 
 /**
- * Sealed class representing all possible states of a permission.
+ * Sealed class representing the state of a single permission.
+ * Use [PermissionResults.toResultList] to convert an aggregate result into
+ * a per-permission list of these states.
  */
 sealed class PermissionResult {
 
@@ -23,7 +25,30 @@ data class PermissionResults(
     val denied: List<String>,
     val permanentlyDenied: List<String>
 ) {
-    val allGranted: Boolean get() = denied.isEmpty() && permanentlyDenied.isEmpty()
+    val allGranted: Boolean          get() = denied.isEmpty() && permanentlyDenied.isEmpty()
     val anyPermanentlyDenied: Boolean get() = permanentlyDenied.isNotEmpty()
-    val anyDenied: Boolean get() = denied.isNotEmpty()
+    val anyDenied: Boolean            get() = denied.isNotEmpty()
+}
+
+/**
+ * Convert an aggregate [PermissionResults] into a per-permission list of [PermissionResult] states.
+ *
+ * ```kotlin
+ * val result = PermissionManager.with(this)
+ *     .permissions(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+ *     .requestSuspend()
+ *
+ * result.toResultList().forEach { state ->
+ *     when (state) {
+ *         is PermissionResult.Granted           -> enableFeature(state.permission)
+ *         is PermissionResult.Denied            -> showRationale(state.permission)
+ *         is PermissionResult.PermanentlyDenied -> showSettingsPrompt(state.permission)
+ *     }
+ * }
+ * ```
+ */
+fun PermissionResults.toResultList(): List<PermissionResult> = buildList {
+    granted.forEach           { add(PermissionResult.Granted(it)) }
+    denied.forEach            { add(PermissionResult.Denied(it)) }
+    permanentlyDenied.forEach { add(PermissionResult.PermanentlyDenied(it)) }
 }

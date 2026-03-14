@@ -3,6 +3,7 @@
     Default layout for the PermissionDialog.
     All visual properties (colors, text sizes) are applied programmatically
     from DialogConfig so developers can customise without forking layouts.
+    Color resources are prefixed "permlib_" to avoid host-app conflicts.
 -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -11,28 +12,17 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="24dp"
-    android:minWidth="280dp"
-    android:maxWidth="320dp">
-
-    <!-- Icon slot (optional — hidden by default) -->
-    <ImageView
-        android:id="@+id/iv_permission_icon"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="12dp"
-        android:visibility="gone"
-        android:contentDescription="@null" />
+    android:minWidth="280dp">
 
     <!-- Title -->
     <TextView
         android:id="@+id/tv_permission_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Permission Required"
+        android:text="@string/permlib_title_permission_required"
         android:textStyle="bold"
         android:textSize="18sp"
-        android:textColor="#212121"
+        android:textColor="@color/permlib_text_primary"
         android:layout_marginBottom="12dp" />
 
     <!-- Message -->
@@ -40,9 +30,9 @@
         android:id="@+id/tv_permission_message"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="This permission is required for the app to function properly."
+        android:text="@string/permlib_msg_permission_required"
         android:textSize="14sp"
-        android:textColor="#616161"
+        android:textColor="@color/permlib_text_secondary"
         android:lineSpacingMultiplier="1.4"
         android:layout_marginBottom="24dp" />
 
@@ -50,7 +40,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#E0E0E0"
+        android:background="@color/permlib_divider"
         android:layout_marginBottom="8dp" />
 
     <!-- Button row -->
@@ -66,8 +56,8 @@
             style="?attr/borderlessButtonStyle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Cancel"
-            android:textColor="#757575"
+            android:text="@string/permlib_btn_cancel"
+            android:textColor="@color/permlib_btn_secondary"
             android:minWidth="80dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp" />
@@ -78,8 +68,8 @@
             style="?attr/borderlessButtonStyle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Open Settings"
-            android:textColor="#2196F3"
+            android:text="@string/permlib_btn_open_settings"
+            android:textColor="@color/permlib_btn_primary"
             android:textStyle="bold"
             android:minWidth="80dp"
             android:paddingStart="8dp"
