@@ -14,7 +14,7 @@ plugins {
 // ── Library coordinates ───────────────────────────────────────────────────────
 val libGroupId    = "com.github.theankitparmar"
 val libArtifactId = "permissionlib"
-val libVersion    = "1.0.57"
+val libVersion    = "1.0.56"
 
 android {
     namespace  = "com.theankitparmar.permissionlib"
